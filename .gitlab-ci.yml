@@ -16,7 +16,7 @@ build:
   services:
     - docker:dind
   before_script:
-    - apk add make python3
+    - apk add make python3 bash
     - pip3 install awscli
     - aws ecr get-login --no-include-email --region us-east-1 | sh -
   script:
