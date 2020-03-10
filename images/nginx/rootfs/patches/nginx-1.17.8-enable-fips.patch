@@ -1,0 +1,23 @@
+diff --git a/src/event/ngx_event_openssl.c b/src/event/ngx_event_openssl.c
+index 91b415ca..60d8f277 100644
+--- a/src/event/ngx_event_openssl.c
++++ b/src/event/ngx_event_openssl.c
+@@ -164,6 +164,18 @@ ngx_ssl_init(ngx_log_t *log)
+ 
+ #endif
+ 
++// Enable FIPS mode for OpenSSL
++int ret = FIPS_mode_set(1);
++if (ret != 1) {
++    ERR_load_crypto_strings();
++    ERR_print_errors_fp(stderr);
++
++    ngx_ssl_error(NGX_LOG_EMERG, log, 0, "FIPS_mode_set() failed: %lx.", ERR_get_error());
++    return NGX_ERROR;
++} else {
++    fprintf(stderr,"*** IN FIPS MODE ***\n");
++}
++
+ #ifndef SSL_OP_NO_COMPRESSION
+     {
+     /*

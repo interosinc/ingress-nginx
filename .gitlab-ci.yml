@@ -1,0 +1,24 @@
+stages:
+  - build
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "nginx-0.30.0-fips"'
+      when: always
+    - when: never
+
+variables:
+  REGISTRY: 913617820371.dkr.ecr.us-east-1.amazonaws.com
+  
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - apk add make
+    - aws ecr get-login --no-include-email --region us-east-1 | sh -
+  script:
+    - cd images/nginx
+    - make push
+  allow_failure: false

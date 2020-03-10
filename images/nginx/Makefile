@@ -24,7 +24,7 @@ REGISTRY ?= quay.io/kubernetes-ingress-controller
 IMGNAME = nginx
 IMAGE = $(REGISTRY)/$(IMGNAME)
 
-PLATFORMS = amd64 arm arm64
+PLATFORMS = amd64
 
 EMPTY :=
 SPACE := $(EMPTY) $(EMPTY)

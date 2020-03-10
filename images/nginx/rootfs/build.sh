@@ -49,6 +49,8 @@ export LUA_RESTY_BALANCER=0.03
 export LUA_RESTY_CORE=0.1.17
 export LUA_CJSON_VERSION=2.1.0.7
 export LUA_RESTY_COOKIE_VERSION=766ad8c15e498850ac77f5e0265f1d3f30dc4027
+export OPENSSL_VERSION=1.0.2u
+export OPENSSL_FIPS_VERSION=2.0.16
 
 export BUILD_PATH=/tmp/build
 
@@ -79,7 +81,6 @@ apk add \
   libc-dev \
   make \
   automake \
-  openssl-dev \
   pcre-dev \
   zlib-dev \
   linux-headers \
@@ -95,7 +96,6 @@ apk add \
   geoip-dev \
   patch \
   libaio-dev \
-  openssl \
   cmake \
   util-linux \
   lmdb-tools \
@@ -137,6 +137,12 @@ get_src 97d23ecf6d5150b30e284b40e8a6f7e3bb5be6b601e373a4d013768d5a25965b \
 
 get_src 49f50d4cd62b166bc1aaf712febec5e028d9f187cedbc27a610dfd01bdde2d36 \
         "https://github.com/simpl/ngx_devel_kit/archive/v$NDK_VERSION.tar.gz"
+
+get_src a3cd13d0521d22dd939063d3b4a0d4ce24494374b91408a05bdaca8b681c63d4 \
+        "https://www.openssl.org/source/openssl-fips-$OPENSSL_FIPS_VERSION.tar.gz"
+
+get_src ecd0c6ffb493dd06707d38b14bb4d8c2288bb7033735606569d8f90f89669d16 \
+        "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
 
 get_src f1ad2459c4ee6a61771aa84f77871f4bfe42943a4aa4c30c62ba3f981f52c201 \
         "https://github.com/openresty/set-misc-nginx-module/archive/v$SETMISC_VERSION.tar.gz"
@@ -215,6 +221,12 @@ get_src 59d2f18ecadba48be61061004c8664eaed1111a3372cd2567cb24c5a47eb41fe \
 
 get_src f818b5cef0881e5987606f2acda0e491531a0cb0c126d8dca02e2343edf641ef \
         "https://github.com/cloudflare/lua-resty-cookie/archive/$LUA_RESTY_COOKIE_VERSION.tar.gz"
+
+# Compile the OpenSSL FIPS module first, as it doesn't seem to play well with parallel compilation
+cd "$BUILD_PATH/openssl-fips-$OPENSSL_FIPS_VERSION"
+./config
+make
+make install
 
 # improve compilation times
 CORES=$(($(grep -c ^processor /proc/cpuinfo) - 0))
@@ -462,6 +474,14 @@ WITH_FLAGS="--with-debug \
   --with-http_secure_link_module \
   --with-http_gunzip_module"
 
+# We need to export this to enable the OpenSSL FIPS "linker" to fallback to GCC when setting the integrity test digest
+export FIPSLD_CC=gcc
+
+# Update the library cache to pick up the newly compiled libraries
+ldconfig
+
+echo ">>>>>>>>ldconfig"
+
 # "Combining -flto with -g is currently experimental and expected to produce unexpected results."
 # https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
 CC_OPT="-g -Og -fPIE -fstack-protector-strong \
@@ -505,6 +525,8 @@ WITH_MODULES="--add-module=$BUILD_PATH/ngx_devel_kit-$NDK_VERSION \
   --add-module=$BUILD_PATH/nginx_ajp_module-${NGINX_AJP_VERSION} \
   --add-module=$BUILD_PATH/ngx_brotli"
 
+echo ">>>>>>>>configure"
+
 ./configure \
   --prefix=/usr/local/nginx \
   --conf-path=/etc/nginx/nginx.conf \
@@ -524,13 +546,19 @@ WITH_MODULES="--add-module=$BUILD_PATH/ngx_devel_kit-$NDK_VERSION \
   --without-mail_imap_module \
   --without-http_uwsgi_module \
   --without-http_scgi_module \
+  --with-cc=/usr/local/ssl/fips-2.0/bin/fipsld
   --with-cc-opt="${CC_OPT}" \
   --with-ld-opt="${LD_OPT}" \
+  --with-openssl="${BUILD_PATH}/openssl-$OPENSSL_VERSION" \
+  --with-openssl-opt="fips" \
   --user=www-data \
   --group=www-data \
   ${WITH_MODULES}
 
+echo ">>>>>>>make"
+
 make
+echo ">>>>>>>make install"
 make install
 
 cd "$BUILD_PATH/luarocks-${RESTY_LUAROCKS_VERSION}"
