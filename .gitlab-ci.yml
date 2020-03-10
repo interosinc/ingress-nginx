@@ -1,4 +1,4 @@
-gitstages:
+stages:
   - build
 
 workflow:
